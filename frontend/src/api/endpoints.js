@@ -338,6 +338,34 @@ export const getWeights = async () => {
 
 export const setWeights = (body) => api.put('/config/weights', body);
 
+// Simulation control
+export const startSimulation = async () => {
+  try {
+    return await api.post('/simulation/start');
+  } catch (error) {
+    if (import.meta.env.DEV) return { data: { success: true, status: { running: true, riderCount: 0, queueDepth: 0 } } };
+    throw error;
+  }
+};
+
+export const stopSimulation = async () => {
+  try {
+    return await api.post('/simulation/stop');
+  } catch (error) {
+    if (import.meta.env.DEV) return { data: { success: true, status: { running: false, riderCount: 0, queueDepth: 0 } } };
+    throw error;
+  }
+};
+
+export const getSimulationStatus = async () => {
+  try {
+    return await api.get('/simulation/status');
+  } catch (error) {
+    if (import.meta.env.DEV) return { data: { success: true, status: { running: false, riderCount: 0, queueDepth: 0 } } };
+    throw error;
+  }
+};
+
 // Analytics
 export const getAnalytics = async () => {
   try {

@@ -40,11 +40,11 @@ export async function createOrder() {
 }
 
 export async function bulkCreateOrders(count) {
-  let created = 0;
+  const created = [];
   for (let i = 0; i < count; i++) {
     try {
-      await createOrder();
-      created++;
+      const order = await createOrder();
+      created.push(order);
     } catch {
       // skip — no eligible customer found for this attempt
     }

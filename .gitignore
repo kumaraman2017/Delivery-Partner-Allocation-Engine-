@@ -6,3 +6,4 @@ build/
 CLAUDE.md
 screenshots/
 .playwright-mcp/
+/docs/SIMULATION_LOGIC_EXPLANATION.MD

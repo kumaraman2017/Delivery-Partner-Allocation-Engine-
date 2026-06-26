@@ -1,11 +1,12 @@
 import express from 'express';
-import authRoutes       from './auth.js';
-import riderRoutes      from './riders.js';
-import restaurantRoutes from './restaurants.js';
-import customerRoutes   from './customers.js';
-import orderRoutes      from './orders.js';
-import allocationRoutes from './allocation.js';
-import configRoutes     from './config.js';
+import authRoutes        from './auth.js';
+import riderRoutes       from './riders.js';
+import restaurantRoutes  from './restaurants.js';
+import customerRoutes    from './customers.js';
+import orderRoutes       from './orders.js';
+import allocationRoutes  from './allocation.js';
+import configRoutes      from './config.js';
+import simulationRoutes  from './simulation.js';
 import Rider from '../models/Rider.js';
 import Order from '../models/Order.js';
 
@@ -34,5 +35,6 @@ router.use('/customers',   customerRoutes);
 router.use('/orders',      orderRoutes);
 router.use('/allocation',  allocationRoutes);
 router.use('/config',      configRoutes);
+router.use('/simulation',  simulationRoutes);
 
 export default router;

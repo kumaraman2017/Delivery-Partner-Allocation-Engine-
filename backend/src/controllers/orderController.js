@@ -1,9 +1,11 @@
 import Order from '../models/Order.js';
 import { createOrder, bulkCreateOrders } from '../services/orderGenerator.js';
+import { addPendingOrder } from '../services/simulationEngine.js';
 
 export const createSingleOrder = async (req, res, next) => {
   try {
     const order = await createOrder();
+    addPendingOrder(order);
     res.status(201).json({ success: true, data: order });
   } catch (err) {
     next(err);
@@ -17,8 +19,9 @@ export const createBulkOrders = async (req, res, next) => {
       res.status(400);
       throw new Error('count must be a number between 1 and 100');
     }
-    const created = await bulkCreateOrders(count);
-    res.status(201).json({ success: true, created, requested: count });
+    const orders = await bulkCreateOrders(count);
+    orders.forEach(addPendingOrder);
+    res.status(201).json({ success: true, created: orders.length, requested: count });
   } catch (err) {
     next(err);
   }

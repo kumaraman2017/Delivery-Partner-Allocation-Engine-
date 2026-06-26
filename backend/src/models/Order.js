@@ -15,6 +15,8 @@ const OrderSchema = new mongoose.Schema(
     polyline: { type: [{ lat: Number, lng: Number }], default: [] },
     leg1Duration_s: { type: Number },
     leg2Duration_s: { type: Number },
+    leg1OriginLat: { type: Number },
+    leg1OriginLng: { type: Number },
     legStartedAt: { type: Date },
     progress: { type: Number, default: 0 },
     queuedAt: { type: Date },
