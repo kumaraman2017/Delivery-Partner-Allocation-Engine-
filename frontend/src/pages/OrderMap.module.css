@@ -1,0 +1,28 @@
+.mapWrap {
+  width: 100%;
+  height: 420px;
+}
+
+.pinRestaurant {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5a623;
+  border: 2px solid #ffffff;
+}
+
+.pinCustomer {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7928ca;
+  border: 2px solid #ffffff;
+}
+
+.pinRider {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0070f3;
+  border: 2px solid #ffffff;
+}

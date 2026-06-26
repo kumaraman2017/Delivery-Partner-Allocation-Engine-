@@ -10,4 +10,5 @@ export const config = {
   mongoUri: process.env.MONGODB_URI,
   jwtSecret: process.env.JWT_SECRET,
   adminPassword: process.env.ADMIN_PASSWORD || 'admin123',
+  mapboxToken: process.env.MAPBOX_TOKEN,
 };

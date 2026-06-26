@@ -7,9 +7,9 @@ import MapPanel from '../components/common/MapPanel';
 import { useSimulation } from '../context/SimulationContext';
 import styles from './RiderMap.module.css';
 
-const MAPBOX_TOKEN   = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
-const RANCHI_CENTER  = { longitude: 85.33, latitude: 23.35, zoom: 13 };
-const MAP_STYLE      = 'mapbox://styles/mapbox/dark-v11';
+const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+const RANCHI_CENTER = { longitude: 85.33, latitude: 23.35, zoom: 13 };
+const MAP_STYLE     = 'mapbox://styles/mapbox/dark-v11';
 
 const circleLayer = {
   id:   'riders',
@@ -33,10 +33,20 @@ const circleLayer = {
   },
 };
 
-export default function RiderMap() {
-  const { riders, connected, queueDepth } = useSimulation();
+const routeLineLayer = {
+  id:   'routes',
+  type: 'line',
+  paint: {
+    'line-color':   '#f5a623',
+    'line-width':   2,
+    'line-opacity': 0.65,
+  },
+};
 
-  const geojson = useMemo(() => ({
+export default function RiderMap() {
+  const { riders, connected, queueDepth, routes } = useSimulation();
+
+  const riderGeojson = useMemo(() => ({
     type: 'FeatureCollection',
     features: riders.map((r) => ({
       type:       'Feature',
@@ -44,6 +54,15 @@ export default function RiderMap() {
       properties: { id: r._id, status: r.status, availabilityStatus: r.availabilityStatus },
     })),
   }), [riders]);
+
+  const routeGeojson = useMemo(() => ({
+    type: 'FeatureCollection',
+    features: Array.from(routes.values()).map(({ leg1Coords, leg2Coords }) => ({
+      type:     'Feature',
+      geometry: { type: 'LineString', coordinates: [...leg1Coords, ...leg2Coords] },
+      properties: {},
+    })),
+  }), [routes]);
 
   const eyebrow = connected
     ? `Fleet — Live · ${riders.length} riders · Queue: ${queueDepth}`
@@ -73,7 +92,10 @@ export default function RiderMap() {
             initialViewState={RANCHI_CENTER}
             mapStyle={MAP_STYLE}
           >
-            <Source id="riders" type="geojson" data={geojson}>
+            <Source id="routes" type="geojson" data={routeGeojson}>
+              <Layer {...routeLineLayer} />
+            </Source>
+            <Source id="riders" type="geojson" data={riderGeojson}>
               <Layer {...circleLayer} />
             </Source>
           </Map>

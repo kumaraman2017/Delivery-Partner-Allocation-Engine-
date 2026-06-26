@@ -17,6 +17,8 @@ const OrderSchema = new mongoose.Schema(
     leg2Duration_s: { type: Number },
     leg1OriginLat: { type: Number },
     leg1OriginLng: { type: Number },
+    leg1Coords: { type: [[Number]], default: [] },
+    leg2Coords: { type: [[Number]], default: [] },
     legStartedAt: { type: Date },
     progress: { type: Number, default: 0 },
     queuedAt: { type: Date },

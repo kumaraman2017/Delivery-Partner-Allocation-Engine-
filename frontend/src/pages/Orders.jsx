@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, TextField } from '@mui/material';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
@@ -7,8 +8,9 @@ import { getOrders, createOrder, bulkOrders } from '../api/endpoints';
 import styles from './Orders.module.css';
 
 export default function Orders() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
-  const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [status, setStatus] = useState('loading');
   const [bulkCount, setBulkCount] = useState(5);
 
   const fetchOrders = () => {
@@ -64,17 +66,18 @@ export default function Orders() {
               <TableCell>Status</TableCell>
               <TableCell>Assigned rider</TableCell>
               <TableCell>Created at</TableCell>
+              <TableCell />
             </TableRow>
           </TableHead>
           <TableBody>
             {status !== 'ready' || orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className={styles.emptyCell}>
+                <TableCell colSpan={6} className={styles.emptyCell}>
                   <EmptyState
                     title={status === 'error' ? 'Could not load orders' : 'No orders yet'}
                     description={
                       status === 'error'
-                        ? 'The backend isn’t reachable yet — this will resolve once it’s live.'
+                        ? 'The backend is not reachable yet.'
                         : 'Orders created here will appear once the backend is running.'
                     }
                   />
@@ -88,6 +91,9 @@ export default function Orders() {
                   <TableCell><StatusBadge kind="order" status={o.status} /></TableCell>
                   <TableCell>{o.assignedRiderId ?? '—'}</TableCell>
                   <TableCell>{o.createdAt ? new Date(o.createdAt).toLocaleString() : '—'}</TableCell>
+                  <TableCell>
+                    <Button size="small" onClick={() => navigate(`/map/orders/${o._id}`)}>Map</Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}

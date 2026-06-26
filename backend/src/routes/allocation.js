@@ -5,6 +5,7 @@ import AllocationHistory from '../models/AllocationHistory.js';
 import { getCandidateCells, allocateOrder } from '../services/allocationEngine.js';
 import { getWeights, RIDER_SPEED_KMH } from '../config/constants.js';
 import { haversine } from '../utils/haversine.js';
+import { getRoute } from '../services/routingService.js';
 
 const router = express.Router();
 
@@ -87,6 +88,19 @@ router.post('/allocate', async (req, res, next) => {
         candidatesConsidered,
       }),
     ]);
+
+    getRoute(
+      { lat: winner.latitude,     lng: winner.longitude      },
+      { lat: order.restaurantLat, lng: order.restaurantLng   },
+      { lat: order.customerLat,   lng: order.customerLng     }
+    ).then(route =>
+      Order.findByIdAndUpdate(order._id, {
+        leg1Coords:     route.leg1Coords,
+        leg2Coords:     route.leg2Coords,
+        leg1Duration_s: route.leg1Duration_s,
+        leg2Duration_s: route.leg2Duration_s,
+      })
+    ).catch(err => console.warn('[allocation] getRoute failed, lerp coords remain:', err.message));
 
     return res.json({
       assigned: true,
