@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement the deterministic weighted rider scoring function, supporting schema/generator changes, a simulation state stub, and admin routes for manual testing and weight configuration.
+**Goal:** Implement the deterministic weighted rider scoring function, a simulation state stub, and admin routes for manual testing and weight configuration.
 
 **Architecture:** `allocateOrder` is a pure function — it reads only from in-memory Maps (`h3Buckets`, `riderState`), never touches MongoDB on the hot path. A thin `simulation.js` stub provides those Maps during B6; B8 populates them for real. Routes wrap the function for manual trigger testing and live weight configuration.
 
@@ -16,13 +16,13 @@
 |---|---|---|
 | `src/services/allocationEngine.js` | Create | Pure scoring function + reason template |
 | `src/services/simulation.js` | Create (stub) | Exports empty Maps; B8 replaces with full impl |
-| `src/models/Order.js` | Modify | Add `restaurantH3: String` field |
-| `src/services/orderGenerator.js` | Modify | Snapshot `restaurant.h3Index` onto order |
 | `src/routes/allocation.js` | Create | `POST /allocate-order`, `GET /allocation-history` |
 | `src/routes/configRoutes.js` | Create | `GET /config/weights`, `PUT /config/weights` |
 | `src/routes/index.js` | Modify | Mount two new route files |
 | `src/tests/allocationEngine.test.js` | Create | Unit tests for pure allocation logic |
 | `package.json` | Modify | Add vitest + `test` script |
+
+> **`restaurantH3` is NOT stored on the Order.** `latLngToCell` is pure bit manipulation — essentially free. The allocation engine calls it inline; the diskCache then handles the expensive `gridDisk` computation. No schema change needed.
 
 ---
 
@@ -75,66 +75,7 @@ git commit -m "chore: add vitest for backend unit testing"
 
 ---
 
-## Task 2: Add `restaurantH3` to Order schema and orderGenerator
-
-**Files:**
-- Modify: `src/models/Order.js` (after line 14 — after the `status` field)
-- Modify: `src/services/orderGenerator.js` (inside the `Order.create()` call)
-
-- [ ] **Step 1: Add the field to Order.js**
-
-In `src/models/Order.js`, find the block that starts with `restaurantId` and add `restaurantH3` after `restaurantLng`:
-
-```js
-restaurantId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Restaurant', required: true },
-restaurantName: { type: String, required: true },
-restaurantLat:  { type: Number, required: true },
-restaurantLng:  { type: Number, required: true },
-restaurantH3:   { type: String },
-```
-
-- [ ] **Step 2: Snapshot restaurantH3 in orderGenerator.js**
-
-In `src/services/orderGenerator.js`, inside the `Order.create({...})` call, add `restaurantH3` after `restaurantLng`:
-
-```js
-return Order.create({
-  restaurantId:   restaurant._id,
-  restaurantName: restaurant.name,
-  restaurantLat:  restaurant.latitude,
-  restaurantLng:  restaurant.longitude,
-  restaurantH3:   restaurant.h3Index,
-  customerId:     customer._id,
-  customerName:   customer.name,
-  customerLat:    customer.latitude,
-  customerLng:    customer.longitude,
-  status:         'PENDING',
-  queuedAt:       new Date(),
-});
-```
-
-- [ ] **Step 3: Verify no syntax errors**
-
-```bash
-node --input-type=module <<'EOF'
-import './src/models/Order.js'
-import './src/services/orderGenerator.js'
-console.log('OK')
-EOF
-```
-
-Expected: `OK`
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add src/models/Order.js src/services/orderGenerator.js
-git commit -m "feat: add restaurantH3 snapshot to Order schema and orderGenerator"
-```
-
----
-
-## Task 3: Create simulation.js stub
+## Task 2: Create simulation.js stub
 
 **Files:**
 - Create: `src/services/simulation.js`
@@ -176,7 +117,7 @@ git commit -m "feat: add simulation state stub (populated in B8)"
 
 ---
 
-## Task 4: Implement `allocationEngine.js`
+## Task 3: Implement `allocationEngine.js`
 
 **Files:**
 - Create: `src/services/allocationEngine.js`
@@ -388,9 +329,10 @@ Expected: multiple failures with `Cannot find module '../services/allocationEngi
 - [ ] **Step 3: Create `src/services/allocationEngine.js`**
 
 ```js
-import { gridDisk } from 'h3-js'
+import { latLngToCell, gridDisk } from 'h3-js'
 import { haversine } from '../utils/haversine.js'
 import {
+  H3_RESOLUTION,
   H3_CANDIDATE_K,
   RIDER_SPEED_KMH,
   LOAD_WINDOW_MINUTES,
@@ -446,7 +388,8 @@ function computeEtar(rider, restaurantLat, restaurantLng) {
 
 // ─── Main allocation function ─────────────────────────────────────────────────
 export function allocateOrder(order, h3Buckets, riderState, weights) {
-  const candidateCells = getCandidateCells(order.restaurantH3)
+  const restaurantH3 = latLngToCell(order.restaurantLat, order.restaurantLng, H3_RESOLUTION)
+  const candidateCells = getCandidateCells(restaurantH3)  // diskCache handles gridDisk
 
   // Gather unique rider IDs from all 19 cells
   const candidateIds = new Set()
@@ -574,7 +517,7 @@ git commit -m "feat: implement allocation engine with gridDisk cache and early-e
 
 ---
 
-## Task 5: Create allocation routes
+## Task 4: Create allocation routes
 
 **Files:**
 - Create: `src/routes/allocation.js`
@@ -658,7 +601,7 @@ git commit -m "feat: add POST /allocate-order and GET /allocation-history routes
 
 ---
 
-## Task 6: Create config weights routes, mount all routes
+## Task 5: Create config weights routes, mount all routes
 
 **Files:**
 - Create: `src/routes/configRoutes.js`
@@ -818,14 +761,13 @@ git commit -m "feat: add config weights routes and mount all B6 routes"
 | maxETAR=0 → ETARScore=1 edge case | Task 4 (test + impl) |
 | maxLoad=0 → LoadScore=1 edge case | Task 4 (test + impl) |
 | `generateReason` template | Task 4 |
-| `restaurantH3` on Order schema | Task 2 |
-| `restaurantH3` snapshot in orderGenerator | Task 2 |
-| `POST /allocate-order` | Task 5 |
-| `GET /allocation-history` | Task 5 |
-| `GET /config/weights` | Task 6 |
-| `PUT /config/weights` with validation | Task 6 |
-| `AllocationHistory` record on allocation | Task 5 |
-| `breakdown.distanceToRestaurant_km` | Task 4 |
+| `restaurantH3` computed inline via `latLngToCell` (no schema change) | Task 3 |
+| `POST /allocate-order` | Task 4 |
+| `GET /allocation-history` | Task 4 |
+| `GET /config/weights` | Task 5 |
+| `PUT /config/weights` with validation | Task 5 |
+| `AllocationHistory` record on allocation | Task 4 |
+| `breakdown.distanceToRestaurant_km` | Task 3 |
 
 All spec requirements covered. No gaps.
 

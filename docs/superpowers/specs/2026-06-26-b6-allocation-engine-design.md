@@ -16,8 +16,6 @@ Implements the deterministic weighted scoring function that picks the best rider
 | File | Change |
 |---|---|
 | `src/services/allocationEngine.js` | New — core allocation function |
-| `src/models/Order.js` | Add `restaurantH3: String` field |
-| `src/services/orderGenerator.js` | Snapshot `restaurant.h3Index` onto order as `restaurantH3` |
 | `src/routes/allocation.js` | New — `POST /allocate-order`, `GET /allocation-history` |
 | `src/routes/configRoutes.js` | New — `GET /config/weights`, `PUT /config/weights` |
 | `src/routes/index.js` | Mount new routes |
@@ -36,7 +34,8 @@ export function allocateOrder(order, h3Buckets, riderState, weights)
 ### Pipeline
 
 ```
-1.  restaurantH3   = order.restaurantH3          // O(1) — no recompute
+1.  restaurantH3   = latLngToCell(order.restaurantLat, order.restaurantLng, H3_RESOLUTION)
+                     // latLngToCell is pure bit manipulation — O(1), no schema field needed
 2.  candidateCells = getCandidateCells(restaurantH3)  // cached gridDisk
 3.  candidates     = union h3Buckets[cell] for each candidateCell
                      → map to rider objects from riderState
@@ -99,27 +98,7 @@ Sparse zone edges produce zero or single-candidate results frequently at city sc
 
 ---
 
-## 4. `Order.js` — Schema Addition
-
-```js
-restaurantH3: { type: String }
-```
-
-Populated at order creation from `restaurant.h3Index`. Allows the allocation engine to skip `latLngToCell` entirely on the hot path.
-
----
-
-## 5. `orderGenerator.js` — Snapshot Change
-
-In `createOrder()`, add one field to the `Order.create()` call:
-
-```js
-restaurantH3: restaurant.h3Index,
-```
-
----
-
-## 6. Routes
+## 4. Routes
 
 ### `POST /allocate-order` (admin only)
 
@@ -151,7 +130,7 @@ Returns `getWeights()` — current live weights object.
 
 ---
 
-## 7. Edge Cases
+## 5. Edge Cases
 
 | Case | Behaviour |
 |---|---|
@@ -165,7 +144,7 @@ Returns `getWeights()` — current live weights object.
 
 ---
 
-## 8. `AllocationHistory` Record Written on Assignment
+## 6. `AllocationHistory` Record Written on Assignment
 
 ```js
 {
@@ -187,7 +166,7 @@ Returns `getWeights()` — current live weights object.
 
 ---
 
-## 9. What This Does NOT Do
+## 7. What This Does NOT Do
 
 - No AI explanation (Gemini) — template reason is sufficient for MVP
 - No MongoDB query on the hot path — all data comes from `h3Buckets` and `riderState`
