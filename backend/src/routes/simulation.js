@@ -12,9 +12,13 @@ router.post('/start', async (req, res, next) => {
   }
 });
 
-router.post('/stop', (req, res) => {
-  stopSimulation();
-  res.json({ success: true, status: getStatus() });
+router.post('/stop', async (req, res, next) => {
+  try {
+    await stopSimulation();
+    res.json({ success: true, status: getStatus() });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get('/status', (req, res) => {

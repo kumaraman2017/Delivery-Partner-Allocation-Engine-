@@ -14,10 +14,12 @@ import AllocationHistory from '../models/AllocationHistory.js';
 
 // ─── In-memory state ─────────────────────────────────────────────────────────
 
-const riderState   = new Map();   // riderId(string) → riderEntry
-const h3Buckets    = new Map();   // h3Cell(string)  → Set<riderId(string)>
-const pendingQueue = new Map();   // orderId(string)  → orderDoc
-const activeRoutes = new Map();   // orderId(string)  → { riderId, leg1Coords, leg2Coords }
+const riderState        = new Map();   // riderId(string) → riderEntry
+const h3Buckets         = new Map();   // h3Cell(string)  → Set<riderId(string)>
+const pendingQueue      = new Map();   // orderId(string)  → orderDoc
+const activeRoutes      = new Map();   // orderId(string)  → { riderId, leg1Coords, leg2Coords }
+const recentAssignments = [];          // capped ring-buffer of last 20 order:assigned payloads
+const RECENT_CAP        = 20;
 
 let tickTimer = null;
 let ioRef     = null;
@@ -28,8 +30,12 @@ let running   = false;
 export function initSimulation(io) {
   ioRef = io;
   io.on('connection', (socket) => {
+    socket.emit('simulation:status', { running });
     for (const [orderId, route] of activeRoutes) {
       socket.emit('order:route', { orderId, ...route });
+    }
+    if (recentAssignments.length) {
+      socket.emit('recent:assignments', recentAssignments);
     }
   });
 }
@@ -39,15 +45,33 @@ export async function startSimulation() {
   await hydrate();
   running   = true;
   tickTimer = setInterval(tick, TICK_INTERVAL_MS);
+  if (ioRef) ioRef.emit('simulation:status', { running: true });
   console.log('[sim] started');
 }
 
-export function stopSimulation() {
+export async function stopSimulation() {
   if (!running) return;
   clearInterval(tickTimer);
   tickTimer = null;
   running   = false;
-  console.log('[sim] stopped');
+
+  // Flush current in-memory state to DB so restarts always have a clean baseline.
+  const writes = [];
+  for (const [riderId, rider] of riderState) {
+    writes.push(
+      Rider.findByIdAndUpdate(riderId, {
+        status:         rider.status,
+        currentOrderId: rider.currentOrderId ?? null,
+        activeOrders:   rider.status === 'IDLE' ? 0 : 1,
+        latitude:       rider.lat,
+        longitude:      rider.lng,
+        h3Index:        rider.h3Index,
+      }).catch(err => console.error('[sim] flush write failed for', rider.name, ':', err.message))
+    );
+  }
+  await Promise.allSettled(writes);
+  if (ioRef) ioRef.emit('simulation:status', { running: false });
+  console.log(`[sim] stopped + flushed ${riderState.size} riders to DB`);
 }
 
 export function getStatus() {
@@ -79,11 +103,46 @@ export function queueNextOrder(riderId, orderDoc) {
 
 // ─── Hydration ───────────────────────────────────────────────────────────────
 
+// Detect and repair riders whose status is non-IDLE but have no linked order —
+// caused by a failed ASSIGNED write followed by a successful PICKED_UP write.
+async function _healOrphanedRiders() {
+  const orphaned = await Rider.find({
+    availabilityStatus: 'ONLINE',
+    status: { $in: ['ACCEPTED', 'PICKED_UP'] },
+    currentOrderId: null,
+  });
+  if (!orphaned.length) return;
+
+  const orphanedIds = orphaned.map(r => r._id);
+  console.warn(`[sim] healing ${orphaned.length} orphaned rider(s):`, orphaned.map(r => r.name).join(', '));
+
+  await Promise.all([
+    // Reset orphaned riders to IDLE
+    Rider.updateMany(
+      { _id: { $in: orphanedIds } },
+      { status: 'IDLE', currentOrderId: null, activeOrders: 0 }
+    ),
+    // ASSIGNED orders with no rider in-flight → re-queue as PENDING
+    Order.updateMany(
+      { assignedRiderId: { $in: orphanedIds }, status: 'ASSIGNED' },
+      { $set: { status: 'PENDING', assignedRiderId: null, assignedAt: null } }
+    ),
+    // PICKED_UP orders → cancel (food was collected but delivery never completed)
+    Order.updateMany(
+      { assignedRiderId: { $in: orphanedIds }, status: 'PICKED_UP' },
+      { $set: { status: 'CANCELLED', cancelledAt: new Date() } }
+    ),
+  ]);
+}
+
 async function hydrate() {
+  await _healOrphanedRiders();
+
   riderState.clear();
   h3Buckets.clear();
   pendingQueue.clear();
   activeRoutes.clear();
+  recentAssignments.length = 0;
 
   const riders = await Rider.find({ availabilityStatus: 'ONLINE' }).populate({
     path: 'currentOrderId',
@@ -410,14 +469,18 @@ function tick() {
     ]).catch(err => console.error('[sim] assign write failed:', err.message));
 
     if (ioRef) {
-      ioRef.emit('order:assigned', {
+      const assignedPayload = {
         orderId:        order._id.toString(),
         riderId:        winnerId,
         riderName:      winner.name,
         restaurantName: order.restaurantName,
         customerName:   order.customerName,
         score:          result.score,
-      });
+        ts:             now,
+      };
+      ioRef.emit('order:assigned', assignedPayload);
+      recentAssignments.push(assignedPayload);
+      if (recentAssignments.length > RECENT_CAP) recentAssignments.shift();
     }
   }
 
@@ -457,7 +520,9 @@ function _transitionToPickedUp(riderId, rider, now) {
       pickedUpAt: new Date(now),
       legStartedAt: new Date(now),
     }),
-    Rider.findByIdAndUpdate(riderId, { status: 'PICKED_UP' }),
+    // Explicitly re-affirm currentOrderId here so this write is idempotent even
+    // if the earlier ASSIGNED write failed silently (the primary cause of stuck riders).
+    Rider.findByIdAndUpdate(riderId, { status: 'PICKED_UP', currentOrderId: orderId }),
   ]).catch(err => console.error('[sim] pickup write failed:', err.message));
 
   if (ioRef) ioRef.emit('order:status', { orderId: orderId.toString(), status: 'PICKED_UP', riderId });
@@ -574,7 +639,12 @@ function _transitionToDelivered(riderId, rider, now) {
       }).catch(() => {});
     }).catch(err => console.warn('[sim] next-order route fetch failed:', err.message));
 
-    if (ioRef) ioRef.emit('order:assigned', { orderId: nextIdStr, riderId, riderName: rider.name });
+    if (ioRef) {
+      const chainedPayload = { orderId: nextIdStr, riderId, riderName: rider.name, ts: now };
+      ioRef.emit('order:assigned', chainedPayload);
+      recentAssignments.push(chainedPayload);
+      if (recentAssignments.length > RECENT_CAP) recentAssignments.shift();
+    }
 
   } else {
     // ── No queued order — go IDLE ─────────────────────────────────────────────

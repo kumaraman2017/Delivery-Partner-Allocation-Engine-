@@ -50,15 +50,13 @@ export default function Dashboard() {
   const { riders, connected, queueDepth, allocations } = useSimulation();
 
   useEffect(() => {
-    getAnalytics()
-      .then((res) => {
-        setAnalytics(res.data);
-        setAnalyticsStatus('ready');
-      })
-      .catch(() => {
-        setAnalytics(null);
-        setAnalyticsStatus('error');
-      });
+    const load = () =>
+      getAnalytics()
+        .then((res) => { setAnalytics(res.data); setAnalyticsStatus('ready'); })
+        .catch(() => { setAnalytics(null); setAnalyticsStatus('error'); });
+    load();
+    const id = setInterval(load, 10_000);
+    return () => clearInterval(id);
   }, []);
 
   const geojson = useMemo(() => ({
@@ -163,7 +161,7 @@ export default function Dashboard() {
             <EmptyState
               icon={Activity}
               title="No recent allocations"
-              description="Allocation events will appear here once the simulation is running."
+              description="No recent allocations yet. They will appear here in real time."
             />
           ) : (
             <div className={styles.allocationFeed}>

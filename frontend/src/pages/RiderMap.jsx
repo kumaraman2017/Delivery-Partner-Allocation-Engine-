@@ -1,5 +1,6 @@
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Map, { Source, Layer, Popup } from 'react-map-gl';
 import PageHeader from '../components/common/PageHeader';
@@ -260,6 +261,7 @@ export default function RiderMap() {
             initialViewState={RANCHI_CENTER}
             mapStyle={MAP_STYLE}
             onClick={handleMapClick}
+            onZoomEnd={() => setPopup(null)}
             interactiveLayerIds={['unclustered-riders', 'clusters']}
           >
             <Source id="restaurants" type="geojson" data={restaurantGeojson}>
@@ -294,9 +296,9 @@ export default function RiderMap() {
                   {popup.orderId && (
                     <div className={styles.popupOrder}>
                       Order{' '}
-                      <a href={`/map/orders/${popup.orderId}`} className={styles.popupLink}>
+                      <Link to={`/map/orders/${popup.orderId}`} className={styles.popupLink}>
                         #{popup.orderId.slice(-8).toUpperCase()}
-                      </a>
+                      </Link>
                     </div>
                   )}
                 </div>

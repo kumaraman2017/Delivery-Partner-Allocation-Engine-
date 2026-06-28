@@ -23,8 +23,12 @@ export function SimulationProvider({ children }) {
       setQueueDepth(data.queueDepth ?? 0);
     });
 
+    socket.on('recent:assignments', (list) => {
+      setAllocations([...list].reverse().map((a) => ({ ...a, ts: a.ts ?? Date.now() })));
+    });
+
     socket.on('order:assigned', (event) => {
-      setAllocations((prev) => [{ ...event, ts: Date.now() }, ...prev].slice(0, 100));
+      setAllocations((prev) => [{ ...event, ts: event.ts ?? Date.now() }, ...prev].slice(0, 100));
     });
 
     socket.on('order:route', ({ orderId, riderId, leg1Coords, leg2Coords }) => {

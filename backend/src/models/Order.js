@@ -24,8 +24,9 @@ const OrderSchema = new mongoose.Schema(
     queuedAt: { type: Date },
     allocationScore: { type: Number },
     assignedAt:      { type: Date },
-    pickedUpAt: { type: Date },
-    deliveredAt: { type: Date },
+    pickedUpAt:      { type: Date },
+    deliveredAt:     { type: Date },
+    cancelledAt:     { type: Date },
   },
   { timestamps: true }
 );

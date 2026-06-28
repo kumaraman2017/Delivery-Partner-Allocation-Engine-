@@ -14,7 +14,7 @@
     "@emotion/styled": "^11.11.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
-    "@fontsource/space-grotesk": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
     "@mui/material": "^5.14.20",
     "axios": "^1.6.2",
     "lucide-react": "^0.475.0",

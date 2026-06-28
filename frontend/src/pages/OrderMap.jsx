@@ -17,10 +17,16 @@ const MAPBOX_TOKEN   = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 const MAP_STYLE      = 'mapbox://styles/mapbox/dark-v11';
 const RANCHI_DEFAULT = { longitude: 85.33, latitude: 23.35, zoom: 13 };
 
-const routeLineLayer = {
-  id:   'order-route',
+const leg1LineLayer = {
+  id:   'order-leg1',
   type: 'line',
   paint: { 'line-color': '#f5a623', 'line-width': 3, 'line-opacity': 0.85 },
+};
+
+const leg2LineLayer = {
+  id:   'order-leg2',
+  type: 'line',
+  paint: { 'line-color': '#7928ca', 'line-width': 3, 'line-opacity': 0.85 },
 };
 
 export default function OrderMap() {
@@ -49,19 +55,32 @@ export default function OrderMap() {
     [riders, id]
   );
 
-  const routeGeojson = useMemo(() => {
-    const leg1   = order?.leg1Coords ?? [];
-    const leg2   = order?.leg2Coords ?? [];
-    const coords = [...leg1, ...leg2];
+  const leg1Geojson = useMemo(() => {
+    if (!order || order.status !== 'ASSIGNED') return { type: 'FeatureCollection', features: [] };
+    const full    = order.leg1Coords ?? [];
+    const stepIdx = assignedRider?.legStepIndex ?? 0;
+    const coords  = full.slice(stepIdx);
     return {
       type: 'FeatureCollection',
       features: coords.length >= 2
         ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }]
         : [],
     };
-  }, [order]);
+  }, [order, assignedRider]);
 
-  const hasRoute    = (order?.leg1Coords?.length ?? 0) >= 2;
+  const leg2Geojson = useMemo(() => {
+    if (!order) return { type: 'FeatureCollection', features: [] };
+    const full    = order.leg2Coords ?? [];
+    const stepIdx = order.status === 'PICKED_UP' ? (assignedRider?.legStepIndex ?? 0) : 0;
+    const coords  = full.slice(stepIdx);
+    return {
+      type: 'FeatureCollection',
+      features: coords.length >= 2
+        ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }]
+        : [],
+    };
+  }, [order, assignedRider]);
+
   const initialView = order
     ? { longitude: order.restaurantLng, latitude: order.restaurantLat, zoom: 13 }
     : RANCHI_DEFAULT;
@@ -75,11 +94,11 @@ export default function OrderMap() {
       />
 
       <MapPanel
-        eyebrow="Route — Rider → Restaurant → Customer"
+        eyebrow="Route — Live remaining path"
         legend={[
-          { label: 'Restaurant', color: 'warning' },
-          { label: 'Customer',   color: 'violet'  },
-          { label: 'Rider',      color: 'link'    },
+          { label: 'To restaurant', color: 'warning' },
+          { label: 'To customer',   color: 'violet'  },
+          { label: 'Rider',         color: 'link'    },
         ]}
         variant="full"
       >
@@ -104,11 +123,12 @@ export default function OrderMap() {
               initialViewState={initialView}
               mapStyle={MAP_STYLE}
             >
-              {hasRoute && (
-                <Source id="order-route" type="geojson" data={routeGeojson}>
-                  <Layer {...routeLineLayer} />
-                </Source>
-              )}
+              <Source id="order-leg1" type="geojson" data={leg1Geojson}>
+                <Layer {...leg1LineLayer} />
+              </Source>
+              <Source id="order-leg2" type="geojson" data={leg2Geojson}>
+                <Layer {...leg2LineLayer} />
+              </Source>
 
               {order && (
                 <Marker longitude={order.restaurantLng} latitude={order.restaurantLat} anchor="center">

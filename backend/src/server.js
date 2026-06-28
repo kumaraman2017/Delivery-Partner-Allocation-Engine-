@@ -3,9 +3,9 @@ import { Server } from 'socket.io';
 import app from './app.js';
 import connectDB from './config/db.js';
 import { config } from './config/env.js';
-import { initSimulation } from './services/simulationEngine.js';
+import { initSimulation, startSimulation } from './services/simulationEngine.js';
 
-connectDB();
+await connectDB();
 
 const httpServer = createServer(app);
 
@@ -24,4 +24,5 @@ const PORT = config.port;
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  startSimulation().catch(console.error);
 });

@@ -34,10 +34,12 @@ export default function Topbar({ handleDrawerToggle }) {
         <Box className={styles.spacer} />
 
         <Box className={styles.actions}>
-          <Tooltip title={connected ? 'Simulation live' : 'Waiting for simulation'}>
+          <Tooltip title={connected ? 'Simulation running' : 'Disconnected from server'}>
             <Box className={styles.liveStatus}>
               <LiveDot active={connected} />
-              <span className={styles.liveLabel}>{connected ? 'Live' : 'Offline'}</span>
+              <span className={styles.liveLabel}>
+                {connected ? 'Live' : 'Offline'}
+              </span>
             </Box>
           </Tooltip>
           <IconButton
