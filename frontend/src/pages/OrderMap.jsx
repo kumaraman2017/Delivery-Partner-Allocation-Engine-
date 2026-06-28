@@ -1,5 +1,5 @@
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Button } from '@mui/material';
 import { RefreshCw } from 'lucide-react';
@@ -13,7 +13,7 @@ import { getOrder } from '../api/endpoints';
 import { useSimulation } from '../context/SimulationContext';
 import styles from './OrderMap.module.css';
 
-const MAPBOX_TOKEN   = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+const MAPBOX_TOKEN   = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || import.meta.env.VITE_MAPBOX_TOKEN || '';
 const MAP_STYLE      = 'mapbox://styles/mapbox/dark-v11';
 const RANCHI_DEFAULT = { longitude: 85.33, latitude: 23.35, zoom: 13 };
 
@@ -30,10 +30,21 @@ const leg2LineLayer = {
 };
 
 export default function OrderMap() {
+  const mapRef = useRef(null);
+  const mapContainerRef = useRef(null);
   const { id } = useParams();
   const [order, setOrder] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const { riders } = useSimulation();
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(mapContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const fetchOrder = () => {
     setStatus('loading');
@@ -86,15 +97,16 @@ export default function OrderMap() {
     : RANCHI_DEFAULT;
 
   return (
-    <Box>
+    <Box className={styles.pageRoot}>
       <PageHeader
         title="Order Map"
         description="Restaurant, customer, and assigned rider for this delivery."
         action={order && <StatusBadge kind="order" status={order.status} />}
       />
 
-      <MapPanel
-        eyebrow="Route — Live remaining path"
+      <div className={styles.mapPanelWrap}>
+        <MapPanel
+          eyebrow="Route — Live remaining path"
         legend={[
           { label: 'To restaurant', color: 'warning' },
           { label: 'To customer',   color: 'violet'  },
@@ -102,7 +114,7 @@ export default function OrderMap() {
         ]}
         variant="full"
       >
-        <div className={styles.mapWrap}>
+        <div className={styles.mapWrap} ref={mapContainerRef}>
           {status === 'loading' && <Skeleton shape="block" />}
 
           {status === 'error' && (
@@ -119,9 +131,11 @@ export default function OrderMap() {
 
           {status === 'ready' && (
             <Map
+              ref={mapRef}
               mapboxAccessToken={MAPBOX_TOKEN}
               initialViewState={initialView}
               mapStyle={MAP_STYLE}
+              style={{ width: '100%', height: '100%' }}
             >
               <Source id="order-leg1" type="geojson" data={leg1Geojson}>
                 <Layer {...leg1LineLayer} />
@@ -151,6 +165,7 @@ export default function OrderMap() {
           )}
         </div>
       </MapPanel>
+      </div>
     </Box>
   );
 }

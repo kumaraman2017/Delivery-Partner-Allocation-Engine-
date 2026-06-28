@@ -10,7 +10,7 @@ import { useSimulation } from '../context/SimulationContext';
 import { getRestaurants } from '../api/endpoints';
 import styles from './RiderMap.module.css';
 
-const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || import.meta.env.VITE_MAPBOX_TOKEN || '';
 const RANCHI_CENTER = { longitude: 85.33, latitude: 23.35, zoom: 13 };
 const MAP_STYLE     = 'mapbox://styles/mapbox/dark-v11';
 
@@ -106,6 +106,16 @@ export default function RiderMap() {
   const [popup, setPopup] = useState(null); // { lng, lat, name, status, orderId }
 
   const mapRef = useRef(null);
+  const mapContainerRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(mapContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     getRestaurants()
@@ -207,14 +217,15 @@ export default function RiderMap() {
   );
 
   return (
-    <Box>
+    <Box className={styles.pageRoot}>
       <PageHeader
         title="Rider Map"
         description="Live positions of every rider, color-coded by movement state."
       />
 
-      <MapPanel
-        eyebrow={eyebrow}
+      <div className={styles.mapPanelWrap}>
+        <MapPanel
+          eyebrow={eyebrow}
         legend={[
           { label: 'Idle',       color: 'riderIdle'    },
           { label: 'Accepted',   color: 'warning'      },
@@ -224,7 +235,7 @@ export default function RiderMap() {
         ]}
         variant="full"
       >
-        <div className={styles.mapWrap}>
+        <div className={styles.mapWrap} ref={mapContainerRef}>
           <div className={styles.statsOverlay}>
             <span className={styles.statItem}>
               <span className={`${styles.statValue} ${styles.statIdle}`}>{stats.idle}</span>
@@ -251,6 +262,7 @@ export default function RiderMap() {
             mapboxAccessToken={MAPBOX_TOKEN}
             initialViewState={RANCHI_CENTER}
             mapStyle={MAP_STYLE}
+            style={{ width: '100%', height: '100%' }}
             onClick={handleMapClick}
             onZoomEnd={() => setPopup(null)}
             interactiveLayerIds={['clusters', 'unclustered-riders']}
@@ -291,6 +303,7 @@ export default function RiderMap() {
           </Map>
         </div>
       </MapPanel>
+      </div>
     </Box>
   );
 }

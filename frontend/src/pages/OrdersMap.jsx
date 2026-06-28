@@ -1,5 +1,5 @@
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Box } from '@mui/material';
 import MapGL, { Source, Layer } from 'react-map-gl';
 import PageHeader from '../components/common/PageHeader';
@@ -9,7 +9,7 @@ import { useSimulation } from '../context/SimulationContext';
 import { getOrders, getRestaurants } from '../api/endpoints';
 import styles from './OrdersMap.module.css';
 
-const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || import.meta.env.VITE_MAPBOX_TOKEN || '';
 const RANCHI_CENTER = { longitude: 85.33, latitude: 23.35, zoom: 12 };
 const MAP_STYLE     = 'mapbox://styles/mapbox/dark-v11';
 const POLL_MS       = 10_000;
@@ -84,9 +84,20 @@ const riderCircleLayer = {
 };
 
 export default function OrdersMap() {
+  const mapRef = useRef(null);
+  const mapContainerRef = useRef(null);
   const { riders, routes, connected } = useSimulation();
   const [orders, setOrders]           = useState([]);
   const [restaurants, setRestaurants] = useState([]);
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(mapContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     getRestaurants()
@@ -217,14 +228,15 @@ export default function OrdersMap() {
   );
 
   return (
-    <Box>
+    <Box className={styles.pageRoot}>
       <PageHeader
         title="Order Map"
         description="Live view of all active orders, pending queue, delivery routes, and rider positions."
       />
 
-      <MapPanel
-        eyebrow={eyebrow}
+      <div className={styles.mapPanelWrap}>
+        <MapPanel
+          eyebrow={eyebrow}
         legend={[
           { label: 'Idle rider',     color: 'riderIdle'   },
           { label: 'To restaurant',  color: 'warning'     },
@@ -235,11 +247,13 @@ export default function OrdersMap() {
         ]}
         variant="full"
       >
-        <div className={styles.mapWrap}>
+        <div className={styles.mapWrap} ref={mapContainerRef}>
           <MapGL
+            ref={mapRef}
             mapboxAccessToken={MAPBOX_TOKEN}
             initialViewState={RANCHI_CENTER}
             mapStyle={MAP_STYLE}
+            style={{ width: '100%', height: '100%' }}
           >
             {/* Layer order: bottom → top so riders render above everything */}
             <Source id="leg1-routes" type="geojson" data={leg1Geojson}>
@@ -263,6 +277,7 @@ export default function OrdersMap() {
           </MapGL>
         </div>
       </MapPanel>
+      </div>
     </Box>
   );
 }

@@ -1,5 +1,5 @@
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Box, Card, Typography } from '@mui/material';
 import { Activity } from 'lucide-react';
 import Map, { Source, Layer } from 'react-map-gl';
@@ -12,7 +12,7 @@ import { getAnalytics } from '../api/endpoints';
 import { useSimulation } from '../context/SimulationContext';
 import styles from './Dashboard.module.css';
 
-const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+const MAPBOX_TOKEN  = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || import.meta.env.VITE_MAPBOX_TOKEN || '';
 const RANCHI_CENTER = { longitude: 85.33, latitude: 23.35, zoom: 12 };
 const MAP_STYLE     = 'mapbox://styles/mapbox/dark-v11';
 
@@ -45,9 +45,20 @@ function timeAgo(ts) {
 }
 
 export default function Dashboard() {
+  const mapRef = useRef(null);
+  const mapContainerRef = useRef(null);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsStatus, setAnalyticsStatus] = useState('loading'); // loading | ready | error
   const { riders, connected, queueDepth, allocations } = useSimulation();
+
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(mapContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const load = () =>
@@ -82,7 +93,7 @@ export default function Dashboard() {
   const availablePercent = totalRiders > 0 ? Math.round((availableRiders / totalRiders) * 100) : 0;
 
   return (
-    <Box>
+    <Box className={styles.dashboardRoot}>
       <Box className={styles.hero}>
         <div className={styles.heroGlow} aria-hidden="true" />
         <svg className={styles.heroBg} viewBox="0 0 800 220" preserveAspectRatio="none" aria-hidden="true">
@@ -107,20 +118,22 @@ export default function Dashboard() {
           </circle>
         </svg>
 
-        <Box className={styles.heroContent}>
-          <Typography variant="h1" className={styles.heroTitle}>Live Delivery Intelligence</Typography>
-          <Typography className={styles.heroSubtitle}>AI-Powered Delivery Intelligence</Typography>
-        </Box>
+        <Box className={styles.heroInner}>
+          <Box className={styles.heroContent}>
+            <Typography component="h1" className={styles.heroTitle}>Live Delivery Intelligence</Typography>
+            <Typography className={styles.heroSubtitle}>AI-Powered Delivery Intelligence</Typography>
+          </Box>
 
-        <Box className={styles.heroStats}>
-          {stats.map((s) => <StatCard key={s.label} label={s.label} value={s.value} />)}
-          <Box className={styles.heroRing}>
-            <ProgressRing
-              percent={availablePercent}
-              label={analyticsStatus === 'loading' ? '—' : availableRiders}
-              sublabel="Available"
-              color="success"
-            />
+          <Box className={styles.heroStats}>
+            {stats.map((s) => <StatCard key={s.label} label={s.label} value={s.value} />)}
+            <Box className={styles.heroRing}>
+              <ProgressRing
+                percent={availablePercent}
+                label={analyticsStatus === 'loading' ? '—' : availableRiders}
+                sublabel="Available"
+                color="success"
+              />
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -141,11 +154,13 @@ export default function Dashboard() {
           ]}
           variant="compact"
         >
-          <div className={styles.miniMapWrap}>
+          <div className={styles.miniMapWrap} ref={mapContainerRef}>
             <Map
+              ref={mapRef}
               mapboxAccessToken={MAPBOX_TOKEN}
               initialViewState={RANCHI_CENTER}
               mapStyle={MAP_STYLE}
+              style={{ width: '100%', height: '100%' }}
             >
               <Source id="riders-mini" type="geojson" data={geojson}>
                 <Layer {...circleLayer} />
@@ -169,10 +184,10 @@ export default function Dashboard() {
                 <div key={a.orderId + a.ts} className={`${styles.allocationItem} ${styles.flashIn}`}>
                   <div>
                     <div className={styles.allocationRider}>
-                      Rider {String(a.riderId).slice(-6)}
+                      {a.riderName || `Rider #${String(a.riderId).slice(-6)}`}
                     </div>
                     <div className={styles.allocationMeta}>
-                      Order {String(a.orderId).slice(-6)}
+                      {a.restaurantName ? `${a.restaurantName} → ${a.customerName || 'Customer'}` : `Order #${String(a.orderId).slice(-6)}`}
                     </div>
                   </div>
                   <div className={styles.allocationRight}>
