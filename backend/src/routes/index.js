@@ -1,4 +1,5 @@
 import express from 'express';
+import { protect } from '../middleware/authMiddleware.js';
 import authRoutes        from './auth.js';
 import riderRoutes       from './riders.js';
 import restaurantRoutes  from './restaurants.js';
@@ -29,12 +30,12 @@ router.get('/analytics', async (req, res) => {
 });
 
 router.use('/auth',        authRoutes);
-router.use('/riders',      riderRoutes);
-router.use('/restaurants', restaurantRoutes);
-router.use('/customers',   customerRoutes);
-router.use('/orders',      orderRoutes);
-router.use('/allocation',  allocationRoutes);
-router.use('/config',      configRoutes);
-router.use('/simulation',  simulationRoutes);
+router.use('/riders',      protect, riderRoutes);
+router.use('/restaurants', protect, restaurantRoutes);
+router.use('/customers',   protect, customerRoutes);
+router.use('/orders',      protect, orderRoutes);
+router.use('/allocation',  protect, allocationRoutes);
+router.use('/config',      protect, configRoutes);
+router.use('/simulation',  protect, simulationRoutes);
 
 export default router;
