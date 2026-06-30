@@ -6,7 +6,7 @@ import { getCandidateCells, allocateOrder } from '../services/allocationEngine.j
 import { getWeights, RIDER_SPEED_KMH } from '../config/constants.js';
 import { haversine } from '../utils/haversine.js';
 import { getRoute } from '../services/routingService.js';
-import { queueNextOrder } from '../services/simulationEngine.js';
+import { queueNextOrder, syncManualAllocation } from '../services/simulationEngine.js';
 
 const router = express.Router();
 
@@ -78,6 +78,8 @@ router.post('/allocate', async (req, res, next) => {
           allocationScore: score, breakdown, candidatesConsidered,
         }),
       ]);
+
+      syncManualAllocation(winner._id, order._id);
 
       getRoute(
         { lat: winner.latitude,     lng: winner.longitude    },
